@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Registro de asistencia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --fondo: #EEF1F4;
+    --tinta: #1B2430;
+    --suave: #5B6676;
+    --linea: #D3D9E0;
+    --marca: #2B4C7E;
+    --ok: #1E7F47;
+    --rep: #A86A12;
+    --mal: #B03024;
+    --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --texto: "Barlow", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--fondo);
+    color: var(--tinta);
+    font-family: var(--texto);
+    font-size: 16px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pantalla {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 480px;
+    min-height: 100%;
+    margin: 0 auto;
+    padding: 20px 16px 28px;
+  }
+  .pantalla.activa { display: flex; }
+
+  .logo { background: #fff; border-radius: 14px; padding: 10px; border: 1px solid var(--linea); }
+  .logo img { display: block; width: 100%; height: auto; }
+  .logo-mini { display: flex; justify-content: center; }
+  .logo-mini img { display: block; height: 48px; width: auto; max-width: 100%; border-radius: 8px; }
+  h1 { font-family: var(--display); font-weight: 700; font-size: 2.6rem; line-height: 1; margin: 8px 0 0; }
+  p { margin: 0; color: var(--suave); line-height: 1.45; }
+  label { display: block; font-weight: 600; font-size: .95rem; margin-bottom: 6px; }
+  input {
+    width: 100%;
+    font: inherit;
+    font-size: 1.1rem;
+    padding: 14px;
+    border: 2px solid var(--linea);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--tinta);
+  }
+  input:focus { outline: none; border-color: var(--marca); }
+  button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 1.05rem;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 2px solid var(--marca);
+    background: var(--marca);
+    color: #fff;
+    cursor: pointer;
+  }
+  button.secundario { background: transparent; color: var(--marca); }
+  button.enlace { background: none; border: none; padding: 6px; color: var(--marca); text-decoration: underline; font-size: .95rem; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--rep); outline-offset: 2px; }
+  button:disabled { opacity: .5; }
+  .error { color: var(--mal); font-weight: 600; min-height: 1.4em; }
+
+  .sin-red {
+    display: none;
+    background: var(--mal); color: #fff; font-weight: 600;
+    padding: 10px 12px; border-radius: 10px; text-align: center;
+  }
+  .sin-red.ver { display: block; }
+
+  .barra { display: flex; justify-content: space-between; align-items: flex-end; }
+  .momento small, .contador small { display: block; font-size: .85rem; color: var(--suave); margin-bottom: 2px; }
+  #momento { font-family: var(--display); font-weight: 700; font-size: 2.8rem; line-height: .9; }
+  #momento.cerrado { color: var(--mal); }
+  .contador { text-align: right; }
+  #cuenta { font-family: var(--display); font-weight: 600; font-size: 2rem; line-height: 1; }
+
+  .visor { position: relative; aspect-ratio: 1 / 1; border-radius: 14px; overflow: hidden; background: var(--tinta); }
+  #lector { width: 100%; height: 100%; }
+  #lector video { width: 100% !important; height: 100% !important; object-fit: cover; }
+  .aviso-camara {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; gap: 14px;
+    align-items: center; justify-content: center;
+    padding: 28px; text-align: center; color: #fff; line-height: 1.5;
+  }
+  .aviso-camara button { background: #fff; color: var(--tinta); border-color: #fff; }
+  .resultado {
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; justify-content: center;
+    padding: 24px; color: #fff;
+  }
+  .resultado.ver { display: flex; animation: entra .16s ease-out; }
+  .resultado.espera { background: rgba(27, 36, 48, .88); }
+  .resultado.ok { background: var(--ok); }
+  .resultado.duplicado { background: var(--rep); }
+  .resultado.invalido, .resultado.error, .resultado.cerrado { background: var(--mal); }
+  .r-estado { font-weight: 600; font-size: 1.1rem; }
+  .r-nombre {
+    font-family: var(--display); font-weight: 700;
+    font-size: clamp(2.2rem, 11vw, 3.4rem); line-height: .95;
+    margin: 8px 0 12px; overflow-wrap: anywhere;
+  }
+  .r-detalle { font-size: 1.05rem; line-height: 1.4; }
+  @keyframes entra { from { transform: scale(.97); opacity: .6; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .resultado.ver { animation: none; } }
+
+  .acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .manual { display: none; gap: 10px; }
+  .manual.ver { display: flex; }
+  .manual input { flex: 1; text-transform: uppercase; }
+  .pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: .85rem; }
+  .pie p { font-size: .85rem; }
+</style>
+</head>
+<body>
+
+<section id="inicio" class="pantalla activa">
+  <div class="logo"><img src="logo.png" alt="II Congreso de Ginecología y Obstetricia" width="766" height="187"></div>
+  <h1>Registro de asistencia</h1>
+  <p>Escribe tu nombre y el PIN que te dio la organización.</p>
+  <div>
+    <label for="staff">Tu nombre</label>
+    <input id="staff" autocomplete="name" maxlength="60">
+  </div>
+  <div>
+    <label for="pin">PIN</label>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off">
+  </div>
+  <div class="error" id="errorInicio"></div>
+  <button id="entrar">Empezar a escanear</button>
+</section>
+
+<section id="escaner" class="pantalla">
+  <div class="logo-mini"><img src="logo.png" alt="" width="197" height="48"></div>
+  <div class="sin-red" id="sinRed">Sin internet: los escaneos no se guardan.</div>
+
+  <div class="barra">
+    <div class="momento"><small>Registrando</small><span id="momento"></span></div>
+    <div class="contador"><small>Tus escaneos</small><span id="cuenta">0</span></div>
+  </div>
+
+  <div class="visor">
+    <div id="lector"></div>
+    <div class="aviso-camara" id="avisoCamara">
+      <span>La cámara en vivo no abrió en este celular. Prueba reactivarla, o usa "Escanear con foto" o "Escribir ID o documento".</span>
+      <button id="btnReactivar">Reactivar cámara</button>
+    </div>
+    <div class="resultado" id="resultado" role="status" aria-live="assertive">
+      <div class="r-estado" id="rEstado"></div>
+      <div class="r-nombre" id="rNombre"></div>
+      <div class="r-detalle" id="rDetalle"></div>
+    </div>
+  </div>
+
+  <div class="acciones">
+    <button class="secundario" id="btnFoto">Escanear con foto</button>
+    <button class="secundario" id="btnManual">Escribir ID o documento</button>
+  </div>
+  <div class="manual" id="manual">
+    <input id="idManual" placeholder="GO-045 o n.º de documento" autocapitalize="characters" autocomplete="off" maxlength="40">
+    <button id="registrarManual">Registrar</button>
+  </div>
+
+  <input type="file" id="archivo" accept="image/*" capture="environment" hidden>
+  <div id="lectorFoto" hidden></div>
+
+  <div class="pie">
+    <p id="pie"></p>
+    <button class="enlace" id="btnSalir">Salir</button>
+  </div>
+</section>
+
+<script>
+  // PEGA AQUÍ la URL de la implementación de Apps Script (la que termina en /exec)
+  const API_URL = 'PEGA_AQUI_LA_URL_DE_TU_APPS_SCRIPT';
+
+  const BLOQUEO_MISMO_CODIGO_MS = 5000;  // evita dobles lecturas del mismo QR
+  const REFRESCO_MOMENTO_MS = 60000;     // refresca el momento activo cada 60 s
+  const TIEMPO_MAX_MS = 30000;           // si el servidor no responde en 30 s, se avisa
+
+  const $ = id => document.getElementById(id);
+  let PIN = '', STAFF = '', TOTAL = 3;
+  let ocupado = false, ultimo = '', ultimoT = 0, cuenta = 0;
+  let temporizador = null, intervalo = null, lector = null;
+
+  /* ---------- Comunicación con Apps Script ---------- */
+  function api(datos) {
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const t = ctrl ? setTimeout(() => ctrl.abort(), TIEMPO_MAX_MS) : null;
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // text/plain evita la verificación CORS previa
+      body: JSON.stringify(datos),
+      signal: ctrl ? ctrl.signal : undefined
+    })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .finally(() => { if (t) clearTimeout(t); });
+  }
+
+  /* ---------- Utilidades de pantalla ---------- */
+  function guardar(clave, valor) { try { localStorage.setItem(clave, valor); } catch (e) {} }
+  function leer(clave) { try { return localStorage.getItem(clave); } catch (e) { return null; } }
+  function claveCuenta() { return 'cuenta-' + new Date().toISOString().slice(0, 10); }
+
+  function mostrarPantalla(id) {
+    document.querySelectorAll('.pantalla').forEach(s => s.classList.toggle('activa', s.id === id));
+  }
+
+  function pintarMomento(m) {
+    const el = $('momento');
+    el.textContent = m || 'Cerrado';
+    el.classList.toggle('cerrado', !m || m === 'Cerrado');
+  }
+
+  function vibrar(patron) {
+    try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) {}
+  }
+
+  function actualizarRed() {
+    $('sinRed').classList.toggle('ver', !navigator.onLine);
+  }
+  window.addEventListener('online', actualizarRed);
+  window.addEventListener('offline', actualizarRed);
+
+  $('staff').value = leer('staffNombre') || '';
+  cuenta = parseInt(leer(claveCuenta()) || '0', 10) || 0;
+  $('cuenta').textContent = cuenta;
+
+  /* ---------- Inicio de sesión del staff ---------- */
+  function entrar() {
+    STAFF = $('staff').value.trim();
+    const pin = $('pin').value.trim();
+    if (!STAFF || !pin) { $('errorInicio').textContent = 'Escribe tu nombre y el PIN.'; return; }
+    if (API_URL.indexOf('/exec') === -1) { $('errorInicio').textContent = 'Falta configurar la URL de Apps Script en este archivo.'; return; }
+    $('entrar').disabled = true;
+    $('errorInicio').textContent = '';
+    api({ accion: 'estado', pin: pin })
+      .then(r => {
+        $('entrar').disabled = false;
+        if (!r.ok) { $('errorInicio').textContent = r.mensaje || 'No se pudo entrar.'; return; }
+        PIN = pin;
+        TOTAL = r.totalMomentos || 3;
+        guardar('staffNombre', STAFF);
+        pintarMomento(r.momento);
+        $('pie').textContent = (r.evento || '') + ' | ' + STAFF;
+        actualizarRed();
+        mostrarPantalla('escaner');
+        iniciarCamara();
+        clearInterval(intervalo);
+        intervalo = setInterval(actualizarMomento, REFRESCO_MOMENTO_MS);
+      })
+      .catch(() => {
+        $('entrar').disabled = false;
+        $('errorInicio').textContent = 'No se pudo conectar. Revisa el internet y vuelve a intentar.';
+      });
+  }
+  $('entrar').onclick = entrar;
+  $('pin').addEventListener('keydown', ev => { if (ev.key === 'Enter') entrar(); });
+
+  function salir(mensaje) {
+    PIN = '';
+    clearInterval(intervalo);
+    clearTimeout(temporizador);
+    ocupado = false;
+    $('resultado').className = 'resultado';
+    detenerCamara();
+    $('pin').value = '';
+    $('errorInicio').textContent = mensaje || '';
+    mostrarPantalla('inicio');
+  }
+  $('btnSalir').onclick = () => salir('');
+
+  function actualizarMomento() {
+    if (!PIN) return;
+    api({ accion: 'estado', pin: PIN })
+      .then(r => {
+        if (r.estado === 'pin') { salir('El PIN cambió. Pide el nuevo a la organización.'); return; }
+        if (r.ok) pintarMomento(r.momento);
+      })
+      .catch(() => {});
+  }
+
+  /* ---------- Cámara en vivo ---------- */
+  function crearLector() {
+    if (lector) return lector;
+    const opciones = { verbose: false };
+    if (window.Html5QrcodeSupportedFormats) opciones.formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+    lector = new Html5Qrcode('lector', opciones);
+    return lector;
+  }
+
+  function estaEscaneando() {
+    try {
+      const SCANNING = (window.Html5QrcodeScannerState && Html5QrcodeScannerState.SCANNING) || 2;
+      return lector && lector.getState() === SCANNING;
+    } catch (e) { return false; }
+  }
+
+  function iniciarCamara() {
+    $('avisoCamara').style.display = 'none';
+    crearLector();
+    if (estaEscaneando()) return;
+    lector.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.7); return { width: s, height: s }; } },
+      texto => procesar(texto, 'camara'),
+      () => {}
+    ).catch(() => { $('avisoCamara').style.display = 'flex'; });
+  }
+
+  function detenerCamara() {
+    if (!estaEscaneando()) return Promise.resolve();
+    try { return lector.stop().catch(() => {}); } catch (e) { return Promise.resolve(); }
+  }
+
+  $('btnReactivar').onclick = () => { detenerCamara().then(iniciarCamara); };
+
+  // Al volver a la página (bloqueo de pantalla, cambio de app) la cámara puede quedar detenida
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && PIN) {
+      iniciarCamara();
+      actualizarMomento();
+    }
+  });
+
+  /* ---------- Envío del código al servidor ---------- */
+  function procesar(texto, origen) {
+    const codigo = String(texto || '').trim().toUpperCase();
+    const ahora = Date.now();
+    if (!codigo || ocupado || !PIN) return;
+    if (origen === 'camara' && codigo === ultimo && ahora - ultimoT < BLOQUEO_MISMO_CODIGO_MS) return;
+
+    if (!navigator.onLine) {
+      mostrarResultado('error', { mensaje: 'Sin internet. No se guardó: vuelve a escanear cuando haya conexión.' });
+      return;
+    }
+
+    ocupado = true; ultimo = codigo; ultimoT = ahora;
+    mostrarResultado('espera', { origen: origen });
+
+    api({ accion: 'registrar', pin: PIN, staff: STAFF, codigo: codigo, origen: origen })
+      .then(r => {
+        if (r.estado === 'pin') { salir(r.mensaje || 'El PIN cambió. Vuelve a entrar.'); return; }
+        mostrarResultado(r.estado || 'error', r);
+      })
+      .catch(err => {
+        ultimo = '';
+        const lento = err && err.name === 'AbortError';
+        mostrarResultado('error', {
+          mensaje: (lento ? 'El servidor tardó demasiado.' : 'Sin conexión.') +
+            ' Escanea de nuevo: si ya se había guardado, saldrá en amarillo.'
+        });
+      });
+  }
+
+  function mostrarResultado(estado, r) {
+    const caja = $('resultado');
+    let e = '', n = '', d = '', duracion = 2200;
+    clearTimeout(temporizador);
+    r = r || {};
+
+    if (estado === 'espera') {
+      e = r.origen === 'manual' ? 'Buscando…' : 'Registrando…';
+      d = r.origen === 'manual' ? 'Si la persona se acaba de registrar, puede tardar unos segundos.' : '';
+    } else if (estado === 'ok') {
+      e = r.momento + ': registrado';
+      n = r.nombre;
+      d = r.id + '. A las ' + r.hora + '. Lleva ' + r.pasadas + ' de ' + (r.totalMomentos || TOTAL) + ' momentos.';
+      cuenta++;
+      $('cuenta').textContent = cuenta;
+      guardar(claveCuenta(), String(cuenta));
+      vibrar(80);
+    } else if (estado === 'duplicado') {
+      e = 'Ya estaba registrado';
+      n = r.nombre;
+      d = r.momento + ' registrado a las ' + r.hora + '. No se guardó de nuevo.';
+      duracion = 3000;
+      vibrar([60, 60, 60]);
+    } else if (estado === 'invalido') {
+      e = 'No encontrado';
+      n = r.codigo || 'Sin código';
+      d = r.manual
+        ? 'No está en la lista. Si llenó el formulario hace un momento, espera un minuto e intenta de nuevo. Si no, envíala con la organización.'
+        : 'Este QR no es del congreso o no está en la lista. Prueba escribiendo su número de documento.';
+      duracion = 4000;
+      vibrar(300);
+    } else if (estado === 'cerrado') {
+      e = 'Registro cerrado';
+      n = 'Aún no toca';
+      d = 'La organización todavía no abre el siguiente registro.';
+      duracion = 3500;
+      vibrar(300);
+    } else {
+      e = 'No se registró';
+      n = 'Intenta de nuevo';
+      d = r.mensaje || '';
+      duracion = 3500;
+      vibrar(300);
+    }
+
+    if (r.momento) pintarMomento(r.momento);
+    $('rEstado').textContent = e;
+    $('rNombre').textContent = n;
+    $('rDetalle').textContent = d;
+    caja.className = 'resultado ver ' + estado;
+
+    if (estado !== 'espera') {
+      temporizador = setTimeout(() => { caja.className = 'resultado'; ocupado = false; }, duracion);
+    }
+  }
+
+  /* ---------- Plan B: foto del QR ---------- */
+  $('btnFoto').onclick = () => $('archivo').click();
+  $('archivo').onchange = ev => {
+    const f = ev.target.files[0];
+    if (!f) return;
+    const lf = new Html5Qrcode('lectorFoto');
+    lf.scanFile(f, false)
+      .then(t => procesar(t, 'foto'))
+      .catch(() => mostrarResultado('error', { mensaje: 'No se encontró un QR en la foto. Acércate y toma otra.' }))
+      .finally(() => { ev.target.value = ''; try { lf.clear(); } catch (x) {} });
+  };
+
+  /* ---------- Plan C: escribir ID o número de documento ---------- */
+  $('btnManual').onclick = () => { $('manual').classList.toggle('ver'); $('idManual').focus(); };
+  $('registrarManual').onclick = () => {
+    const v = $('idManual').value;
+    if (!v.trim()) return;
+    procesar(v, 'manual');
+    $('idManual').value = '';
+  };
+  $('idManual').addEventListener('keydown', ev => { if (ev.key === 'Enter') $('registrarManual').click(); });
+</script>
+</body>
+</html>
